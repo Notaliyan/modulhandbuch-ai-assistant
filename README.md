@@ -8,11 +8,9 @@ The handbook used here is the **Artificial Intelligence (B.Sc.) Module Guide** o
 
 ## Demo
 
-> _Screenshot / GIF placeholder — replace this line with a recording of the chat UI streaming an answer with its Sources panel expanded._
+## Demo
 
-`![Demo of the Modulhandbuch AI Assistant](docs/demo.gif)`
-
----
+![Demo of the Modulhandbuch AI Assistant](docs/demo.gif)
 
 ## Architecture
 
