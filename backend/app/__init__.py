@@ -1,0 +1,1 @@
+"""Modulhandbuch RAG backend package."""

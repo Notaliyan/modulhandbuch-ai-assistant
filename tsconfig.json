@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    // ── Language & Environment ──────────────────────────────────────────────
+    "target": "ES2022",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "ES2022"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    // ── JSX ────────────────────────────────────────────────────────────────
+    "jsx": "react-jsx",
+    // ── Paths & Resolution ─────────────────────────────────────────────────
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@/components/*": [
+        "./src/components/*"
+      ],
+      "@/lib/*": [
+        "./src/lib/*"
+      ],
+      "@/hooks/*": [
+        "./src/hooks/*"
+      ],
+      "@/stores/*": [
+        "./src/stores/*"
+      ],
+      "@/types/*": [
+        "./src/types/*"
+      ],
+      "@/utils/*": [
+        "./src/utils/*"
+      ],
+      "@/styles/*": [
+        "./src/styles/*"
+      ],
+      "@/server/*": [
+        "./src/server/*"
+      ],
+      "@/actions/*": [
+        "./src/app/actions/*"
+      ],
+      "@/config/*": [
+        "./src/config/*"
+      ]
+    },
+    // ── Output ─────────────────────────────────────────────────────────────
+    "outDir": "./dist",
+    "rootDir": ".",
+    "incremental": true,
+    "tsBuildInfoFile": "./.next/cache/tsconfig.tsbuildinfo",
+    // ── Interop ────────────────────────────────────────────────────────────
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "allowJs": false,
+    "forceConsistentCasingInFileNames": true,
+    // ── Strict Type-Checking — production grade ────────────────────────────
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+    // ── Extra Checks ───────────────────────────────────────────────────────
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    // ── Decorators (for Prisma / class-based patterns) ─────────────────────
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    // ── Emit ───────────────────────────────────────────────────────────────
+    "noEmit": true,
+    "isolatedModules": true,
+    // ── Source Maps (for production debugging / Sentry) ────────────────────
+    "sourceMap": true,
+    "inlineSources": false,
+    // ── Plugin: Next.js TypeScript plugin ──────────────────────────────────
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "skipLibCheck": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.d.ts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".next",
+    "out",
+    "coverage",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/*.spec.tsx",
+    "**/*.test.tsx"
+  ]
+}
