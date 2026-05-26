@@ -1,0 +1,30 @@
+# Backend build context excludes.
+# Keep the image small and never bake in secrets or local-only state.
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets — the OpenAI key is injected at runtime via env_file, never copied
+.env
+.env.*
+
+# Local data is bind-mounted at runtime, not copied into the image.
+# This avoids baking a stale copy of the vector store / PDF into the image.
+data/
+
+# Tooling / VCS
+.git/
+.gitignore
+.idea/
+.vscode/
+*.log

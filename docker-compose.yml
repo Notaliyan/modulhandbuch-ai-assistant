@@ -1,198 +1,64 @@
-# =============================================================================
-# docker-compose.yml — Enterprise RAG Engine
-# Services: Next.js App  ·  PostgreSQL 16 + pgvector  ·  pgAdmin (optional)
-# =============================================================================
+# ===========================================================================
+# Full-stack RAG application — Modulhandbuch AI Assistant
+# ===========================================================================
+# Brings up the whole stack with a single command:
+#     docker compose up --build
 #
-# Quick start:
-#   cp .env.example .env        # fill in secrets
-#   docker compose up --build -d
-#
-# Tear down (preserving volumes):
-#   docker compose down
-#
-# Full reset (wipe DB data):
-#   docker compose down -v
-# =============================================================================
+# Services
+#   backend  — FastAPI + LangChain + ChromaDB, exposed on host port 8000
+#   frontend — Next.js 15 production server, exposed on host port 3000
+# ===========================================================================
 
-name: rag-engine
-
-# ── Shared defaults ──────────────────────────────────────────────────────────
-x-logging: &default-logging
-  driver: "json-file"
-  options:
-    max-size: "10m"
-    max-file: "3"
-
-x-restart-policy: &restart-always
-  restart: unless-stopped
-
-# =============================================================================
 services:
-
-  # ── PostgreSQL 16 + pgvector ───────────────────────────────────────────────
-  db:
-    image: ankane/pgvector:latest
-    # Pin to a specific pgvector release for reproducible builds:
-    # image: ankane/pgvector:v0.7.0
-    container_name: rag_postgres
-    <<: *restart-always
-    logging: *default-logging
-
-    environment:
-      POSTGRES_USER:     ${POSTGRES_USER:-raguser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_DB:       ${POSTGRES_DB:-ragdb}
-
-      # Tune shared memory for vector workloads
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
-
-    volumes:
-      # Persist data across restarts
-      - pgdata:/var/lib/postgresql/data
-      # Init scripts: install pgvector extension automatically on first boot
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
-
+  # -------------------------------------------------------------------------
+  # Backend: FastAPI RAG API
+  # -------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rag-backend
     ports:
-      # Expose only on localhost — never bind 0.0.0.0 in production
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
-
+      # host:container — lets you reach the API directly at localhost:8000
+      # (e.g. /docs, /api/health) for debugging.
+      - "8000:8000"
+    env_file:
+      # Supplies OPENAI_API_KEY (and any other settings) at runtime.
+      # This file is git-ignored and never baked into the image.
+      - ./backend/.env
+    volumes:
+      # Bind-mount the already-populated data directory. The container
+      # reuses the existing ChromaDB store and PDF — nothing is re-ingested.
+      - ./backend/data:/app/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-raguser} -d ${POSTGRES_DB:-ragdb}"]
-      interval:    10s
-      timeout:     5s
-      retries:     5
-      start_period: 15s
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
 
-    # PostgreSQL performance tuning for vector workloads
-    command: >
-      postgres
-        -c shared_buffers=256MB
-        -c effective_cache_size=768MB
-        -c maintenance_work_mem=128MB
-        -c work_mem=32MB
-        -c max_connections=100
-        -c wal_buffers=16MB
-        -c checkpoint_completion_target=0.9
-        -c random_page_cost=1.1
-        -c effective_io_concurrency=200
-        -c max_worker_processes=4
-        -c max_parallel_workers_per_gather=2
-        -c max_parallel_workers=4
-        -c log_min_duration_statement=1000
-        -c log_lock_waits=on
-
-    networks:
-      - rag_internal
-
-  # ── Next.js Application ────────────────────────────────────────────────────
-  app:
+  # -------------------------------------------------------------------------
+  # Frontend: Next.js chat UI
+  # -------------------------------------------------------------------------
+  frontend:
     build:
       context: .
       dockerfile: Dockerfile
-      target: runner         # multi-stage: use the final 'runner' stage
       args:
-        - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
-    container_name: rag_app
-    <<: *restart-always
-    logging: *default-logging
-
-    environment:
-      NODE_ENV:       production
-      PORT:           3000
-
-      # Database — connect via internal Docker network hostname
-      DATABASE_URL:   postgresql://${POSTGRES_USER:-raguser}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ragdb}?schema=public&connection_limit=10&pool_timeout=20
-      DIRECT_URL:     postgresql://${POSTGRES_USER:-raguser}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ragdb}?schema=public
-
-      # App secrets — set these in .env
-      NEXTAUTH_SECRET:        ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
-      NEXTAUTH_URL:           ${NEXTAUTH_URL:-http://localhost:3000}
-
-      # OpenAI / embedding provider
-      OPENAI_API_KEY:         ${OPENAI_API_KEY:-}
-      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
-      OPENAI_CHAT_MODEL:      ${OPENAI_CHAT_MODEL:-gpt-4o}
-
-      # Object storage (S3 / Cloudflare R2)
-      STORAGE_ENDPOINT:       ${STORAGE_ENDPOINT:-}
-      STORAGE_ACCESS_KEY:     ${STORAGE_ACCESS_KEY:-}
-      STORAGE_SECRET_KEY:     ${STORAGE_SECRET_KEY:-}
-      STORAGE_BUCKET:         ${STORAGE_BUCKET:-rag-documents}
-      STORAGE_REGION:         ${STORAGE_REGION:-auto}
-
-      # Optional: Sentry DSN for error tracking
-      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
-
+        # IMPORTANT: this is the URL the BROWSER uses, not the container.
+        # The browser runs on the host, so it must reach the backend via
+        # the host-published port. See the explanation in the chat reply.
+        NEXT_PUBLIC_API_URL: "http://127.0.0.1:8000"
+    container_name: rag-frontend
     ports:
-      - "${APP_PORT:-3000}:3000"
-
+      - "3000:3000"
     depends_on:
-      db:
-        condition: service_healthy   # wait for Postgres to pass health check
-
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
-      interval:    15s
-      timeout:     5s
-      retries:     3
-      start_period: 30s
-
-    networks:
-      - rag_internal
-      - rag_external
-
-  # ── pgAdmin 4 — web UI for DB inspection (development only) ───────────────
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: rag_pgadmin
-    profiles:
-      - debug          # only starts with: docker compose --profile debug up
-    <<: *restart-always
-    logging: *default-logging
-
-    environment:
-      PGADMIN_DEFAULT_EMAIL:    ${PGADMIN_EMAIL:-admin@rag.local}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-changeme}
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
-
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
-
-    ports:
-      - "127.0.0.1:${PGADMIN_PORT:-5050}:80"
-
-    depends_on:
-      db:
+      backend:
+        # Wait until the backend healthcheck passes before starting.
         condition: service_healthy
+    restart: unless-stopped
 
-    networks:
-      - rag_internal
-
-# =============================================================================
-# Named volumes — data persists across `docker compose down` (not down -v)
-# =============================================================================
-volumes:
-  pgdata:
-    driver: local
-    name: rag_pgdata
-
-  pgadmin_data:
-    driver: local
-    name: rag_pgadmin_data
-
-# =============================================================================
-# Networks
-# =============================================================================
-networks:
-  # Internal — db ↔ app communication only; not exposed to host
-  rag_internal:
-    driver: bridge
-    internal: false    # set to true to fully isolate from internet
-    name: rag_internal
-
-  # External — app ↔ host/reverse-proxy communication
-  rag_external:
-    driver: bridge
-    name: rag_external
+# Note: no top-level `volumes:` block is needed — the backend uses a bind
+# mount to ./backend/data, so the data lives in your repo on the host and
+# persists naturally across `docker compose down` / `up`.

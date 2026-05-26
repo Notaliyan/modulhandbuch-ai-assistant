@@ -1,0 +1,31 @@
+# Frontend (project root) build context excludes.
+
+# Dependencies — reinstalled inside the image from the lockfile
+node_modules/
+
+# Next.js build output — rebuilt inside the image
+.next/
+out/
+
+# The backend has its own image and build context; don't ship it into
+# the frontend image.
+backend/
+
+# Secrets — NEXT_PUBLIC_API_URL is passed as a build arg, not via files
+.env
+.env.*
+!.env.example
+
+# Tooling / VCS / OS noise
+.git/
+.gitignore
+.idea/
+.vscode/
+*.log
+npm-debug.log*
+.DS_Store
+
+# Docker files themselves don't need to be in the context
+Dockerfile
+.dockerignore
+docker-compose.yml
