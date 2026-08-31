@@ -18,9 +18,11 @@ __pycache__/
 .env
 .env.*
 
-# Local data is bind-mounted at runtime, not copied into the image.
-# This avoids baking a stale copy of the vector store / PDF into the image.
-data/
+# The source PDF (data/docs/) IS copied into the image so a cloud deploy
+# can build its own vector store on first boot. Only the generated store
+# and any local .env are kept out.
+data/chroma/
+data/**/.env
 
 # Tooling / VCS
 .git/

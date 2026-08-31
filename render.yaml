@@ -1,0 +1,27 @@
+# Render blueprint for the backend RAG API.
+# Render dashboard -> New -> Blueprint -> pick this repo. It reads this file,
+# creates the service below, and then prompts you for OPENAI_API_KEY.
+#
+# The frontend is NOT here on purpose - it is deployed to Vercel (see DEPLOY.md),
+# which serves Next.js faster and with no cold start.
+
+services:
+  - type: web
+    name: modulhandbuch-backend
+    runtime: docker
+    repo: https://github.com/Notaliyan/modulhandbuch-ai-assistant
+    branch: main
+    region: frankfurt
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Set in the dashboard when prompted - never committed.
+      - key: OPENAI_API_KEY
+        sync: false
+      # Any *.vercel.app origin may call the API. Add a custom domain via
+      # CORS_ORIGINS_EXTRA in the dashboard if you point one at the frontend.
+      - key: CORS_ALLOW_ORIGIN_REGEX
+        value: https://.*\.vercel\.app

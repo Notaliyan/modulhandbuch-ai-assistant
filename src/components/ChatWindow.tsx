@@ -96,7 +96,8 @@ export default function ChatWindow() {
           patchMessage(assistantId, {
             content:
               `⚠️ ${message}` +
-              "\n\nMake sure the backend is running at http://127.0.0.1:8000.",
+              "\n\nIf this is the first request in a while, the demo server " +
+              "may be waking up — give it up to a minute and try again.",
             streaming: false,
           });
           activeAssistantId.current = null;

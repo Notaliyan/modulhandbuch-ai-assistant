@@ -29,20 +29,24 @@ COPY requirements.txt ./requirements.txt
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
-# Copy the application package.
+# Copy the application package and the source PDF. Locally the data dir is
+# bind-mounted (see docker-compose.yml) and this baked-in copy is shadowed.
+# On a cloud host with no mount, the bundled PDF lets the app ingest on its
+# first boot (see app.rag.ensure_ingested).
 COPY app ./app
+COPY data/docs ./data/docs
+RUN mkdir -p /app/data/chroma
 
-# Ensure the data directories exist. The actual ChromaDB store and PDF are
-# supplied at runtime via a bind mount (see docker-compose.yml), so the
-# already-populated vector store is reused and NOT re-ingested.
-RUN mkdir -p /app/data/docs /app/data/chroma
-
+# Render/other hosts inject $PORT; default to 8000 for local `docker run`.
+ENV PORT=8000
 EXPOSE 8000
 
 # A healthcheck lets docker-compose hold the frontend back until the API is
 # genuinely ready (see `depends_on: condition: service_healthy`).
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
-    CMD curl -fs http://localhost:8000/api/health || exit 1
+    CMD curl -fs "http://localhost:${PORT}/api/health" || exit 1
 
-# No --reload here; that is a dev-only convenience, not for a built image.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell form so ${PORT} is expanded. --forwarded-allow-ips lets uvicorn trust
+# the X-Forwarded-* headers set by the host's proxy (needed for real client
+# IPs in rate limiting). No --reload: that is a dev-only convenience.
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --forwarded-allow-ips '*'
