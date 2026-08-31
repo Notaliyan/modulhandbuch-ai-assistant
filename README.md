@@ -4,9 +4,14 @@ A full-stack Retrieval-Augmented Generation (RAG) application that provides sema
 
 The handbook used here is the **Artificial Intelligence (B.Sc.) Module Guide** of the Deggendorf Institute of Technology (THD).
 
----
+**▶ Live demo: <https://modulhandbuch-ai-assistant.vercel.app>**
 
-## Demo
+> Hosted free: frontend on Vercel, backend on Render. The backend sleeps
+> when idle, so the first question after a quiet spell can take ~50 seconds
+> to wake up — after that it responds in a few seconds. See
+> [`DEPLOY.md`](DEPLOY.md) to host your own.
+
+---
 
 ## Demo
 
