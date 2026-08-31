@@ -47,13 +47,33 @@ class Settings(BaseSettings):
     # --- Server / CORS --------------------------------------------------
     host: str = "127.0.0.1"
     port: int = 8000
-    # Vite dev server default origin.
+    # Local dev origins, always allowed.
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]
+    # Extra allowed origins for a deployed frontend, as a comma-separated
+    # string (env: CORS_ORIGINS_EXTRA), e.g.
+    #   "https://my-app.vercel.app,https://modulhandbuch.example.com"
+    cors_origins_extra: str = ""
+    # Regex matched against the request Origin. The default lets any Vercel
+    # deployment (production + preview URLs) talk to the API with no extra
+    # config. Override or clear via env CORS_ALLOW_ORIGIN_REGEX.
+    cors_allow_origin_regex: str = r"https://.*\.vercel\.app"
+
+    # --- Abuse / cost guards ------------------------------------------------
+    # Reject questions longer than this many characters.
+    max_question_chars: int = 500
+    # Max /api/query requests per client IP per rolling 60 seconds.
+    rate_limit_per_minute: int = 20
+
+    @property
+    def all_cors_origins(self) -> list[str]:
+        """Dev origins plus any comma-separated extras from the environment."""
+        extra = [o.strip() for o in self.cors_origins_extra.split(",") if o.strip()]
+        return [*self.cors_origins, *extra]
 
     def ensure_dirs(self) -> None:
         """Create the data directories if they do not yet exist."""

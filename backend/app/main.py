@@ -12,27 +12,45 @@ Run locally:
 
 from __future__ import annotations
 
+import asyncio
 import json
+from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from app.config import settings
-from app.rag import get_engine
+from app.guards import RateLimiter, client_ip
+from app.rag import ensure_ingested, get_engine
+
+_rate_limiter = RateLimiter(settings.rate_limit_per_minute)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Build the vector store on first boot; never block startup on failure."""
+    try:
+        await asyncio.to_thread(ensure_ingested)
+    except Exception as exc:  # noqa: BLE001 - surfaced via /api/health instead
+        print(f"[startup] ingestion skipped or failed: {exc}")
+    yield
+
 
 app = FastAPI(
     title="Modulhandbuch RAG API",
     description="Retrieval-Augmented Generation over the THD AI module guide.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # --- CORS ------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.all_cors_origins,
+    allow_origin_regex=settings.cors_allow_origin_regex or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -66,7 +84,7 @@ async def health() -> dict:
 
 
 @app.post("/api/query")
-async def query(request: QueryRequest) -> EventSourceResponse:
+async def query(request: QueryRequest, http_request: Request) -> EventSourceResponse:
     """Stream an answer to the user's question via Server-Sent Events.
 
     Event stream
@@ -76,11 +94,49 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     event: done    data: {}                      (once)
     event: error   data: {"message": "..."}      (only on failure)
     """
-    engine = get_engine()
+    question = request.question.strip()
+    ip = client_ip(
+        http_request.headers.get("x-forwarded-for"),
+        http_request.client.host if http_request.client else None,
+    )
 
     async def event_generator() -> AsyncGenerator[dict, None]:
+        if not question:
+            yield {
+                "event": "error",
+                "data": json.dumps({"message": "Please enter a question."}),
+            }
+            return
+        if len(question) > settings.max_question_chars:
+            yield {
+                "event": "error",
+                "data": json.dumps(
+                    {
+                        "message": (
+                            "That question is too long — please keep it under "
+                            f"{settings.max_question_chars} characters."
+                        )
+                    }
+                ),
+            }
+            return
+        if not _rate_limiter.is_allowed(ip):
+            yield {
+                "event": "error",
+                "data": json.dumps(
+                    {
+                        "message": (
+                            "Too many requests from this address. Please wait "
+                            "a minute and try again."
+                        )
+                    }
+                ),
+            }
+            return
+
+        engine = get_engine()
         try:
-            async for item in engine.astream(request.question):
+            async for item in engine.astream(question):
                 kind = item["type"]
                 if kind == "token":
                     yield {

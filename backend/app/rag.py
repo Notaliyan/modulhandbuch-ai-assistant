@@ -131,6 +131,24 @@ def ingest_pdfs() -> int:
     return len(all_chunks)
 
 
+def ensure_ingested() -> None:
+    """Populate the vector store on first run; no-op once it has documents.
+
+    Safe to call on every startup. On a fresh deploy the persisted Chroma
+    directory is empty, so this ingests the bundled PDF once (a few seconds
+    and a fraction of a cent in embeddings). On later restarts the existing
+    store is detected and reused.
+    """
+    store = get_vectorstore()
+    try:
+        if store.get(limit=1).get("ids"):
+            return
+    except Exception:  # noqa: BLE001 - treat any read failure as "empty"
+        pass
+    count = ingest_pdfs()
+    print(f"[startup] ingested {count} chunks into ChromaDB")
+
+
 # ---------------------------------------------------------------------------
 # RAG engine
 # ---------------------------------------------------------------------------
